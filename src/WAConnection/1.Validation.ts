@@ -173,7 +173,7 @@ export class WAConnection extends Base {
         }
         const secret = Buffer.from(json.secret, 'base64')
         if (secret.length !== 144) {
-            throw new Error ('incorrect secret length received: ' + secret.length)
+            throw new BaileysError ('incorrect secret length received: ' + secret.length)
         }
 
         // generate shared key from our private key & the secret shared by the server

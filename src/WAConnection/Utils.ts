@@ -250,7 +250,7 @@ export async function generateThumbnail(buffer: Buffer, mediaType: MessageType, 
     if ('thumbnail' in info) {
         // don't do anything if the thumbnail is already provided, or is null
         if (mediaType === MessageType.audio) {
-            throw new Error('audio messages cannot have thumbnails')
+            throw new BaileysError('audio messages cannot have thumbnails')
         }
     } else if (mediaType === MessageType.image) {
         const buff = await compressImage (buffer)
@@ -317,7 +317,7 @@ export async function decodeMediaMessageBuffer(message: WAMessageContent, fetchR
         const testBuff = Buffer.concat([mediaKeys.iv, file])
         const sign = hmacSign(testBuff, mediaKeys.macKey).slice(0, 10)
         // our sign should equal the mac
-        if (!sign.equals(mac)) throw new Error()
+        if (!sign.equals(mac)) throw new BaileysError('sign should equal the mac')
         
         return aesDecryptWithIV(file, mediaKeys.cipherKey, mediaKeys.iv) // decrypt media
     }

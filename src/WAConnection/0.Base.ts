@@ -180,7 +180,7 @@ export class WAConnection extends EventEmitter {
             const result = await Utils.promiseTimeout(timeoutMs,
                 (resolve, reject) => {
                     onRecv = resolve
-                    onErr = ({reason}) => reject(new Error(reason))
+                    onErr = ({reason}) => reject(new BaileysError(reason))
                     this.on (`TAG:${tag}`, onRecv)
                     this.on ('ws-close', onErr) // if the socket closes, you'll never receive the message
                 },
@@ -329,7 +329,7 @@ export class WAConnection extends EventEmitter {
                 (resolve, reject) => {
                     onClose = ({ reason }) => {
                         if (reason === DisconnectReason.invalidSession || reason === DisconnectReason.intentional) {
-                            reject (new Error(reason))
+                            reject (new BaileysError(reason))
                         }
                     }
                     onOpen = resolve
