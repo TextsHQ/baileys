@@ -43,12 +43,12 @@ export const WA_MESSAGE_STUB_TYPES = function () {
 
 export class BaileysError extends Error {
     status?: number
-    context: any
+    context?: any
 
-    constructor (message: string, context: any) {
+    constructor (message: string, context?: any) {
         super (message)
         this.name = 'BaileysError'
-        this.status = context.status
+        this.status = context?.status
         this.context = context
     }
 }
