@@ -294,7 +294,7 @@ export async function generateThumbnail(file: string, mediaType: MessageType, in
     if ('thumbnail' in info) {
         // don't do anything if the thumbnail is already provided, or is null
         if (mediaType === MessageType.audio) {
-            throw new Error('audio messages cannot have thumbnails')
+            throw new BaileysError('audio messages cannot have thumbnails')
         }
     } else if (mediaType === MessageType.image) {
         const buff = await compressImage(file)

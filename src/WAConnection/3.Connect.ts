@@ -62,7 +62,7 @@ export class WAConnection extends Base {
     protected async connectInternal (options: WAConnectOptions, delayMs?: number) {
         const rejections: ((e?: Error) => void)[] = []
         const rejectAll = (e: Error) => rejections.forEach (r => r(e))
-        const rejectAllOnWSClose = ({ reason }) => rejectAll(new Error(reason))
+        const rejectAllOnWSClose = ({ reason }) => rejectAll(new BaileysError(reason))
         // actual connect
         const connect = () => (
             new Promise((resolve, reject) => {
@@ -107,7 +107,7 @@ export class WAConnection extends Base {
                     }
                 })
                 this.conn.on('error', rejectAll)
-                this.conn.on('close', () => rejectAll(new Error(DisconnectReason.close)))
+                this.conn.on('close', () => rejectAll(new BaileysError(DisconnectReason.close)))
             }) as Promise<WAOpenResult>
         )
 
