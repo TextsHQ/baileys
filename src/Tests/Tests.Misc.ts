@@ -25,7 +25,7 @@ WAConnectionTest('Misc', conn => {
                 if (jid === conn.user.jid) {
                     assert.strictEqual (status, newStatus)
                     conn.removeAllListeners ('user-status-update')
-                    resolve ()
+                    resolve(undefined)
                 }
             })
         })
@@ -79,7 +79,7 @@ WAConnectionTest('Misc', conn => {
                 conn.once ('chat-update', ({jid: tJid, count}) => {
                     if (jid === tJid) {
                         assert.ok (count < 0)
-                        resolve ()
+                        resolve(undefined)
                     }
                 })
             })
@@ -107,7 +107,7 @@ WAConnectionTest('Misc', conn => {
                 if (jid === testJid ) {
                     assert.ok (mute)
                     conn.removeAllListeners ('chat-update')
-                    resolve ()
+                    resolve(undefined)
                 }
             })
         })
@@ -115,6 +115,66 @@ WAConnectionTest('Misc', conn => {
         await waitForEvent
         await delay (2000)
         await conn.modifyChat (testJid, ChatModification.unmute)
+    })
+    it('should star/unchar messages', async () => {
+        for (let i = 1; i <= 5; i++) {
+          await conn.sendMessage(testJid, `Message ${i}`, MessageType.text)
+          await delay(1000)
+        }
+
+        let response = await conn.loadMessages(testJid, 5)
+        let starred = response.messages.filter(m => m.starred)
+        assert.strictEqual(starred.length, 0)
+    
+        conn.starMessage(response.messages[2].key)
+        await delay(2000)
+        conn.starMessage(response.messages[4].key)
+        await delay(2000)
+    
+        response = await conn.loadMessages(testJid, 5)
+        starred = response.messages.filter(m => m.starred)
+        assert.strictEqual(starred.length, 2)
+        await delay(2000)
+        
+        conn.starMessage(response.messages[2].key, 'unstar')
+        await delay(2000)
+
+        response = await conn.loadMessages(testJid, 5)
+        starred = response.messages.filter(m => m.starred)
+        assert.strictEqual(starred.length, 1)
+    })
+    it('should clear a chat', async () => {
+        // Uses chat with yourself to avoid losing chats
+        const selfJid = conn.user.jid
+
+        for (let i = 1; i <= 5; i++) {
+          await conn.sendMessage(selfJid, `Message ${i}`, MessageType.text)
+          await delay(1000)
+        }
+
+        let response = await conn.loadMessages(selfJid, 50)
+        const initialCount = response.messages.length
+
+        assert.ok(response.messages.length >= 0)
+    
+        conn.starMessage(response.messages[2].key)
+        await delay(2000)
+        conn.starMessage(response.messages[4].key)
+        await delay(2000)
+    
+        await conn.modifyChat(selfJid, ChatModification.clear)
+        await delay(2000)
+    
+        response = await conn.loadMessages(selfJid, 50)
+        await delay(2000)
+        assert.ok(response.messages.length < initialCount)
+        assert.ok(response.messages.length > 1)
+    
+        await conn.modifyChat(selfJid, ChatModification.clear, true)
+        await delay(2000)
+    
+        response = await conn.loadMessages(selfJid, 50)
+        assert.strictEqual(response.messages.length, 1)
     })
     it('should return search results', async () => {
         const jids = [null, testJid]
@@ -161,7 +221,7 @@ WAConnectionTest('Misc', conn => {
     it('should detect overlaps and clear messages accordingly', async () => {
         // wait for chats
         await new Promise(resolve => (
-            conn.once('chats-received', ({ hasReceivedLastMessage }) => hasReceivedLastMessage && resolve())
+            conn.once('chats-received', ({ hasReceivedLastMessage }) => hasReceivedLastMessage && resolve(undefined))
         ))
 
         conn.maxCachedMessages = 100
@@ -188,7 +248,7 @@ WAConnectionTest('Misc', conn => {
                         missing.count
                     )
                     assert.strictEqual(missing.count, oldCount)
-                    resolve()
+                    resolve(undefined)
                 }
             })
         ))
@@ -214,7 +274,7 @@ WAConnectionTest('Misc', conn => {
                     if (jid === testJid && typeof ephemeral !== 'undefined') {
                         assert.strictEqual(!!(+ephemeral), ephemeralOn)
                         assert.strictEqual(!!(+chat.ephemeral), ephemeralOn)
-                        resolve()
+                        resolve(undefined)
                         conn.removeAllListeners('chat-update')
                     }
                 })

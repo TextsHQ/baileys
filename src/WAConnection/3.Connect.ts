@@ -202,15 +202,23 @@ export class WAConnection extends Base {
             const l0 = json[0] || ''
             const l1 = typeof json[1] !== 'object' || json[1] === null ? {} : json[1]
             const l2 = ((json[2] || [])[0] || [])[0] || ''
+
             Object.keys(l1).forEach(key => {
-                anyTriggered = anyTriggered || this.emit (`${DEF_CALLBACK_PREFIX}${l0},${key}:${l1[key]},${l2}`, json)
-                anyTriggered = anyTriggered || this.emit (`${DEF_CALLBACK_PREFIX}${l0},${key}:${l1[key]}`, json)
+                anyTriggered = this.emit (`${DEF_CALLBACK_PREFIX}${l0},${key}:${l1[key]},${l2}`, json) || anyTriggered;
+                anyTriggered = this.emit (`${DEF_CALLBACK_PREFIX}${l0},${key}:${l1[key]}`, json) || anyTriggered;
+                anyTriggered = this.emit (`${DEF_CALLBACK_PREFIX}${l0},${key}`, json) || anyTriggered;
             })
-            anyTriggered = anyTriggered || this.emit (`${DEF_CALLBACK_PREFIX}${l0},,${l2}`, json)
-            anyTriggered = anyTriggered || this.emit (`${DEF_CALLBACK_PREFIX}${l0}`, json)
+            anyTriggered = this.emit (`${DEF_CALLBACK_PREFIX}${l0},,${l2}`, json) || anyTriggered;
+            anyTriggered = this.emit (`${DEF_CALLBACK_PREFIX}${l0}`, json) || anyTriggered;
+
             if (anyTriggered) return
 
             if (this.state === 'open' && json[0] === 'Pong') {
+                if (!json[1]) {
+                    this.closeInternal(DisconnectReason.close)
+                    this.logger.info('Connection terminated by phone, closing...')
+                    return
+                }
                 if (this.phoneConnected !== json[1]) {
                     this.phoneConnected = json[1]
                     this.emit ('connection-phone-change', { connected: this.phoneConnected })
