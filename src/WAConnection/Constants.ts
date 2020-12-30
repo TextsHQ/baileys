@@ -212,6 +212,7 @@ export interface WAContact {
 export interface WAUser extends WAContact {
     phone: any
 }
+export type WAContactUpdate = Partial<WAContact> & { jid: string, status?: string }
 export interface WAChat {
     jid: string
 
@@ -377,6 +378,8 @@ export interface MessageOptions {
     /** Should it send as a disappearing messages. 
      * By default 'chat' -- which follows the setting of the chat */
     sendEphemeral?: 'chat' | boolean
+    /** Force message id */
+    messageId?: string
 }
 export interface WABroadcastListInfo {
     status: number
@@ -463,7 +466,6 @@ export type BaileysEvent =
     'ws-close' | 
     'qr' |
     'connection-phone-change' |
-    'user-status-update' |
     'contacts-received' |
     'chats-received' |
     'chat-new' |
@@ -474,4 +476,5 @@ export type BaileysEvent =
     'received-pong' |
     'credentials-updated' |
     'connection-validated' |
-    'blocklist-update'
+    'blocklist-update' |
+    'contact-update'

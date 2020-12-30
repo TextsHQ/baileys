@@ -76,8 +76,29 @@ export class WAConnection extends Base {
                     Buffer.from (status, 'utf-8')
                 ]
             ]
-        ) 
+        )
+        this.emit ('contact-update', { jid: this.user.jid, status })
+
+        // emit deprecated
         this.emit ('user-status-update', { jid: this.user.jid, status })
+        return response
+    }
+    async updateProfileName (name: string) {
+        const response = (await this.setQuery (
+            [
+                [
+                    'profile',
+                    {
+                        name
+                    },
+                    null
+                ]
+            ]
+        )) as any as {status: number, pushname: string}
+        if (response.status === 200) {
+            this.user.name = response.pushname;
+            this.emit ('contact-update', { jid: this.user.jid, name })
+        }
         return response
     }
     /** Get your contacts */
@@ -172,9 +193,6 @@ export class WAConnection extends Base {
      */
     @Mutex (jid => jid)
     async blockUser (jid: string, type: 'add' | 'remove' = 'add') {
-        jid.replace('@s.whatsapp.net', '@c.us')
-
-        const tag = this.generateMessageTag()
         const json: WANode = [
             'block',
             {
@@ -184,7 +202,7 @@ export class WAConnection extends Base {
                 ['user', { jid }, null]
             ],
         ]
-        const result = await this.setQuery ([json], [WAMetric.block, WAFlag.ignore], tag)
+        const result = await this.setQuery ([json], [WAMetric.block, WAFlag.ignore])
 
         if (result.status === 200) {
             if (type === 'add') {

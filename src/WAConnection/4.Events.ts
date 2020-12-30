@@ -1,6 +1,6 @@
 import * as QR from 'qrcode-terminal'
 import { WAConnection as Base } from './3.Connect'
-import { WAMessageStatusUpdate, WAMessage, WAContact, WAChat, WAMessageProto, WA_MESSAGE_STUB_TYPE, WA_MESSAGE_STATUS_TYPE, PresenceUpdate, BaileysEvent, DisconnectReason, WAOpenResult, Presence, AuthenticationCredentials, WAParticipantAction, WAGroupMetadata, WAUser, WANode, WAPresenceData, WAChatUpdate, BlocklistUpdate } from './Constants'
+import { WAMessageStatusUpdate, WAMessage, WAContact, WAChat, WAMessageProto, WA_MESSAGE_STUB_TYPE, WA_MESSAGE_STATUS_TYPE, PresenceUpdate, BaileysEvent, DisconnectReason, WAOpenResult, Presence, AuthenticationCredentials, WAParticipantAction, WAGroupMetadata, WAUser, WANode, WAPresenceData, WAChatUpdate, BlocklistUpdate, WAContactUpdate } from './Constants'
 import { whatsappID, unixTimestampSeconds, isGroupID, GET_MESSAGE_ID, WA_MESSAGE_ID, waMessageKey, newMessagesDB, shallowChanges, toNumber } from './Utils'
 import KeyedDB from '@adiwajshing/keyed-db'
 import { Mutex } from './Mutex'
@@ -235,6 +235,7 @@ export class WAConnection extends Base {
                 user.jid = whatsappID(user.jid)
                 
                 this.contacts[user.jid] = user
+                this.emit('contact-update', user)
                 
                 const chat = this.chats.get (user.jid)
                 if (chat) {
@@ -289,7 +290,10 @@ export class WAConnection extends Base {
             const jid = whatsappID(json[1].jid)
             const imgUrl = await this.getProfilePicture(jid).catch(() => '')
             const contact = this.contacts[jid]
-            if (contact) contact.imgUrl = imgUrl
+            if (contact) {
+                contact.imgUrl = imgUrl
+                this.emit('contact-update', { jid, imgUrl })
+            }
             
             const chat = this.chats.get(jid)
             if (chat) {
@@ -298,9 +302,19 @@ export class WAConnection extends Base {
             }
         })
         // status updates
-        this.on('CB:Status', async json => {
+        this.on('CB:Status,status', async json => {
             const jid = whatsappID(json[1].id)
+            this.emit ('contact-update', { jid, status: json[1].status })
+            // emit deprecated
             this.emit ('user-status-update', { jid, status: json[1].status })
+        })
+        // User Profile Name Updates
+        this.on ('CB:Conn,pushname', json => {
+            if (this.user) {
+                const name = json[1].pushname
+                this.user.name = name // update on client too
+                this.emit ('contact-update', { jid: this.user.jid, name })
+            }
         })
         // read updates
         this.on ('CB:action,,read', async json => {
@@ -351,7 +365,6 @@ export class WAConnection extends Base {
 
         // blocklist updates
         this.on('CB:Blocklist', json => {
-            if (!json) return
             json = json[1]
             const initial = this.blocklist
             this.blocklist = json.blocklist
@@ -443,7 +456,6 @@ export class WAConnection extends Base {
     protected chatAddMessage (message: WAMessage, chat: WAChat) {
         // store updates in this
         const chatUpdate: WAChatUpdate = { jid: chat.jid }
-        
         // add to count if the message isn't from me & there exists a message
         if (!message.key.fromMe && message.message) {
             chat.count += 1
@@ -508,6 +520,11 @@ export class WAConnection extends Base {
             if (message.message && !ephemeralProtocolMsg) {
                 this.chatUpdateTime (chat, +toNumber(message.messageTimestamp))
                 chatUpdate.t = chat.t
+                // a new message unarchives the chat
+                if (chat.archive) {
+                    delete chat.archive
+                    chatUpdate.archive = 'false'
+                }
             }
             chatUpdate.hasNewMessage = true
             chatUpdate.messages = newMessagesDB([ message ])
@@ -632,8 +649,13 @@ export class WAConnection extends Base {
      * @deprecated use `chat-update`
      * */
     on (event: 'user-presence-update', listener: (update: PresenceUpdate) => void): this
-    /** when a user's status is updated */
+    /** 
+     * when a user's status is updated
+     * @deprecated use `contact-update`
+     */
     on (event: 'user-status-update', listener: (update: {jid: string, status?: string}) => void): this
+    /** when a user's status is updated */
+    on (event: 'contact-update', listener: (update: WAContactUpdate) => void): this
     /** when a new chat is added */
     on (event: 'chat-new', listener: (chat: WAChat) => void): this
     /** when contacts are sent by WA */

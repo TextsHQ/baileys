@@ -2,7 +2,7 @@ import { Presence, ChatModification, delay, newMessagesDB, WA_DEFAULT_EPHEMERAL,
 import { promises as fs } from 'fs'
 import * as assert from 'assert'
 import fetch from 'node-fetch'
-import { WAConnectionTest, testJid, assertChatDBIntegrity, sendAndRetreiveMessage } from './Common'
+import { WAConnectionTest, testJid, sendAndRetreiveMessage } from './Common'
 
 WAConnectionTest('Misc', conn => {
 
@@ -44,6 +44,33 @@ WAConnectionTest('Misc', conn => {
         await delay (1000)
 
         await conn.setStatus (response.status) // update back
+    })
+    it('should update profile name', async () => {
+        const newName = 'v cool name'
+
+        await delay (1000)
+
+        const originalName = conn.user.name!
+
+        const waitForEvent = new Promise<void> (resolve => {
+            conn.on ('contact-update', ({name}) => {
+                assert.strictEqual (name, newName)
+                conn.removeAllListeners ('contact-update')
+                resolve ()
+            })
+        })
+
+        await conn.updateProfileName (newName)
+
+        await waitForEvent
+
+        await delay (1000)
+
+        assert.strictEqual (conn.user.name, newName)
+
+        await delay (1000)
+
+        await conn.updateProfileName (originalName) // update back
     })
     it('should return the stories', async () => {
         await conn.getStories()
