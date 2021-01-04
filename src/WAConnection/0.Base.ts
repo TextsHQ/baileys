@@ -61,7 +61,8 @@ export class WAConnection extends EventEmitter {
     messageLog: { tag: string, json: string, fromMe: boolean, binaryTags?: any[] }[] = []
 
     maxCachedMessages = 50
-    loadProfilePicturesForChatsAutomatically = true
+    /** @deprecated won't be supported soon */
+    loadProfilePicturesForChatsAutomatically = false
 
     lastChatsReceived: Date
     chats = new KeyedDB (Utils.waChatKey(false), value => value.jid)
@@ -99,16 +100,20 @@ export class WAConnection extends EventEmitter {
         return null
     }
     async unexpectedDisconnect (error: DisconnectReason) {
-        const willReconnect = 
+        if (this.state === 'open') {
+            const willReconnect = 
             (this.autoReconnect === ReconnectMode.onAllErrors || 
             (this.autoReconnect === ReconnectMode.onConnectionLost && error !== DisconnectReason.replaced)) &&
             error !== DisconnectReason.invalidSession // do not reconnect if credentials have been invalidated
         
-        this.closeInternal(error, willReconnect)
-        willReconnect && (
-            this.connect ()
-            .catch(err => {}) // prevent unhandled exeception
-        ) 
+            this.closeInternal(error, willReconnect)
+            willReconnect && (
+                this.connect()
+                .catch(err => {}) // prevent unhandled exeception
+            ) 
+        } else {
+            this.endConnection(error)
+        }
     }
     /**
      * base 64 encode the authentication credentials and return them
@@ -207,39 +212,52 @@ export class WAConnection extends EventEmitter {
      * @param tag the tag to attach to the message
      */
     async query(q: WAQuery): Promise<any> {
-        let {json, binaryTags, tag, timeoutMs, expect200, waitForOpen, longTag, requiresPhoneConnection, startDebouncedTimeout} = q
+        let {json, binaryTags, tag, timeoutMs, expect200, waitForOpen, longTag, requiresPhoneConnection, startDebouncedTimeout, maxRetries} = q
         requiresPhoneConnection = requiresPhoneConnection !== false
         waitForOpen = waitForOpen !== false
-        if (waitForOpen) await this.waitForConnection()
-
+        let triesLeft = maxRetries || 2
         tag = tag || this.generateMessageTag (longTag)
-        const promise = this.waitForMessage(tag, requiresPhoneConnection, timeoutMs)
 
-        if (this.logger.level === 'trace') {
-            this.logger.trace ({ fromMe: true },`${tag},${JSON.stringify(json)}`)
-        }
+        while (triesLeft >= 0) {
+            if (waitForOpen) await this.waitForConnection()
+            
+            const promise = this.waitForMessage(tag, requiresPhoneConnection, timeoutMs)
 
-        if (binaryTags) tag = await this.sendBinary(json as WANode, binaryTags, tag)
-        else tag = await this.sendJSON(json, tag)
-
-        const response = await promise
-
-        if (expect200 && response.status && Math.floor(+response.status / 100) !== 2) {
-            // read here: http://getstatuscode.com/599
-            if (response.status === 599) {
-                this.unexpectedDisconnect (DisconnectReason.badSession)
-                const response = await this.query (q)
-                return response
+            if (this.logger.level === 'trace') {
+                this.logger.trace ({ fromMe: true },`${tag},${JSON.stringify(json)}`)
             }
 
-            const message = STATUS_CODES[response.status] || 'unknown'
-            throw new BaileysError (
-                `Unexpected status in '${json[0] || 'generic query'}': ${STATUS_CODES[response.status]}(${response.status})`, 
-                {query: json, message, status: response.status}
-            )
+            if (binaryTags) tag = await this.sendBinary(json as WANode, binaryTags, tag)
+            else tag = await this.sendJSON(json, tag)
+
+            try {
+                const response = await promise
+                if (expect200 && response.status && Math.floor(+response.status / 100) !== 2) {
+                    const message = STATUS_CODES[response.status] || 'unknown'
+                    throw new BaileysError (
+                        `Unexpected status in '${json[0] || 'query'}': ${STATUS_CODES[response.status]}(${response.status})`, 
+                        {query: json, message, status: response.status}
+                    )
+                }
+                if (startDebouncedTimeout) {
+                    this.startDebouncedTimeout()
+                }
+                return response
+            } catch (error) {
+                if (triesLeft === 0) {
+                    throw error
+                }
+                // read here: http://getstatuscode.com/599
+                if (error.status === 599) {
+                    this.unexpectedDisconnect (DisconnectReason.badSession)
+                } else if ((error.message === 'close' || error.message === 'lost') && waitForOpen && this.state !== 'close') {
+                    // nothing here
+                } else throw error
+
+                triesLeft -= 1
+                this.logger.debug(`query failed due to ${error}, retrying...`)
+            }
         }
-        if (startDebouncedTimeout) this.startDebouncedTimeout ()
-        return response
     }
     /** interval is started when a query takes too long to respond */
     protected startPhoneCheckInterval () {
@@ -299,7 +317,7 @@ export class WAConnection extends EventEmitter {
     protected startDebouncedTimeout () {
         this.stopDebouncedTimeout ()
         this.debounceTimeout = setTimeout (
-            () => this.emit('ws-close', { reason: DisconnectReason.timedOut }), 
+            () => this.endConnection(DisconnectReason.timedOut), 
             this.connectOptions.maxIdleTimeMs
         )
     }
@@ -330,7 +348,7 @@ export class WAConnection extends EventEmitter {
         let onOpen: () => void
         let onClose: ({ reason }) => void
 
-        if (this.pendingRequestTimeoutMs <= 0) {
+        if (this.pendingRequestTimeoutMs !== null && this.pendingRequestTimeoutMs <= 0) {
             throw new BaileysError(DisconnectReason.close, { status: 428 })
         }
         await (
@@ -380,11 +398,11 @@ export class WAConnection extends EventEmitter {
         this.lastDisconnectReason = reason
         this.lastDisconnectTime = new Date ()
 
-        this.endConnection ()
+        this.endConnection(reason)
         // reconnecting if the timeout is active for the reconnect loop
         this.emit ('close', { reason, isReconnecting })
     }
-    protected endConnection () {
+    protected endConnection (reason: DisconnectReason) {
         this.conn?.removeAllListeners ('close')
         this.conn?.removeAllListeners ('error')
         this.conn?.removeAllListeners ('open')
@@ -396,8 +414,7 @@ export class WAConnection extends EventEmitter {
         this.phoneCheckListeners = 0
         this.clearPhoneCheckInterval ()
         
-
-        this.emit ('ws-close', { reason: DisconnectReason.close })
+        this.emit ('ws-close', { reason })
 
         try {
             this.conn?.close()
