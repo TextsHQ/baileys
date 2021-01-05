@@ -45,15 +45,18 @@ export class BaileysError extends Error {
     status?: number
     context?: any
 
-    constructor (message: string, context?: any) {
+    constructor (message: string, context?: any, stack?: string) {
         super (message)
         this.name = 'BaileysError'
         this.status = context?.status
         this.context = context
+        if(stack) {
+            this.stack = stack
+        }
     }
 }
-export const TimedOutError = () => new BaileysError ('timed out', { status: 408 })
-export const CancelledError = () => new BaileysError ('cancelled', { status: 500 })
+export const TimedOutError = (stack?: string) => new BaileysError ('timed out', { status: 408 }, stack)
+export const CancelledError = (stack?: string) => new BaileysError ('cancelled', { status: 500 }, stack)
 
 export interface WAQuery {
     json: any[] | WANode
@@ -402,9 +405,9 @@ export interface WAMessageStatusUpdate {
 
 export interface WAOpenResult {
     /** Was this connection opened via a QR scan */
-    newConnection: boolean
+    newConnection?: true
     user: WAUser
-    isNewUser: boolean
+    isNewUser?: true
     auth: AuthenticationCredentials
 }
 
@@ -420,8 +423,8 @@ export interface PresenceUpdate {
     deny?: boolean
 }
 export interface BlocklistUpdate {
-    added: string[]
-    removed: string[]
+    added?: string[]
+    removed?: string[]
 }
 // path to upload the media
 export const MediaPathMap = {
@@ -438,11 +441,6 @@ export const MimetypeMap = {
     documentMessage: Mimetype.pdf,
     audioMessage: Mimetype.ogg,
     stickerMessage: Mimetype.webp,
-}
-export interface WASendMessageResponse {
-    status: number
-    messageID: string
-    message: WAMessage
 }
 export type WAParticipantAction = 'add' | 'remove' | 'promote' | 'demote'
 export type BaileysEvent = 
