@@ -381,6 +381,8 @@ export interface MessageOptions {
     sendEphemeral?: 'chat' | boolean
     /** Force message id */
     messageId?: string
+
+    expiration?: number
 }
 export interface WABroadcastListInfo {
     status: number
