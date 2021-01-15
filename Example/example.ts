@@ -9,7 +9,7 @@ import {
     ReconnectMode,
     ProxyAgent,
     waChatKey,
-} from '../src/WAConnection/WAConnection'
+} from '../src/WAConnection'
 import * as fs from 'fs'
 
 async function example() {
@@ -50,6 +50,10 @@ async function example() {
     conn.on('chat-update', async chat => {
         if (chat.presences) { // receive presence updates -- composing, available, etc.
             Object.values(chat.presences).forEach(presence => console.log( `${presence.name}'s presence is ${presence.lastKnownPresence} in ${chat.jid}`))
+        }
+        if(chat.imgUrl) {
+            console.log('imgUrl of chat changed ', chat.imgUrl)
+            return
         }
         // only do something when a new message is received
         if (!chat.hasNewMessage) {
