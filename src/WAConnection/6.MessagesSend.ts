@@ -253,8 +253,8 @@ export class WAConnection extends Base {
         ) {
             message[key].contextInfo = {
                 ...(message[key].contextInfo || {}),
-                expiration: chat?.ephemeral || WA_DEFAULT_EPHEMERAL,
-                ephemeralSettingTimestamp: chat?.eph_setting_ts
+                expiration: options.expiration || chat?.ephemeral || WA_DEFAULT_EPHEMERAL,
+                ephemeralSettingTimestamp: options.expiration || chat?.eph_setting_ts
             }
             message = {
                 ephemeralMessage: {

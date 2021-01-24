@@ -179,6 +179,7 @@ export interface WAGroupMetadata {
     restrict?: 'true' | 'false' 
     /** is set when the group only allows admins to write messages */
     announce?: 'true' | 'false' 
+    ephemeralDuration?: number
     // Baileys modified array
     participants: WAGroupParticipant[]
 }
@@ -377,6 +378,8 @@ export interface MessageOptions {
     sendEphemeral?: 'chat' | boolean
     /** Force message id */
     messageId?: string
+
+    expiration?: number
 }
 export interface WABroadcastListInfo {
     status: number
