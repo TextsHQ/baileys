@@ -47,7 +47,7 @@ export class BaileysError extends Error {
     status?: number
     context?: any
 
-    constructor (message: string, context: any, stack?: string) {
+    constructor (message: string, context?: any, stack?: string) {
         super (message)
         this.name = 'BaileysError'
         this.status = context?.status
