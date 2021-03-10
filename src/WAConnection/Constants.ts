@@ -222,6 +222,10 @@ export interface WAChat {
     spam: 'false' | 'true'
     modify_tag: string
     name?: string
+    /** when ephemeral messages were toggled on */
+    eph_setting_ts?: string
+    /** how long each message lasts for */
+    ephemeral?: string
     
     // Baileys added properties
     messages: KeyedDB<WAMessage, string>
@@ -362,6 +366,13 @@ export interface MessageOptions {
     forceNewMediaOptions?: boolean
     /** Wait for the message to be sent to the server (default true) */
     waitForAck?: boolean
+    /** Should it send as a disappearing messages. 
+     * By default 'chat' -- which follows the setting of the chat */
+    sendEphemeral?: 'chat' | boolean
+    /** Force message id */
+    messageId?: string
+
+    expiration?: number
 }
 export interface WABroadcastListInfo {
     status: number

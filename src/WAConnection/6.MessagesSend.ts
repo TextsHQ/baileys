@@ -14,6 +14,8 @@ import {
 import { generateMessageID, sha256, hmacSign, aesEncrypWithIV, randomBytes, generateThumbnail, getMediaKeys, decodeMediaMessageBuffer, extensionForMediaMessage, whatsappID, unixTimestampSeconds, getAudioDuration  } from './Utils'
 import { Mutex } from './Mutex'
 
+const WA_DEFAULT_EPHEMERAL = 7*24*60*60
+
 export class WAConnection extends Base {
     /**
      * Send a message to the given ID (can be group, single, or broadcast)
@@ -200,6 +202,28 @@ export class WAConnection extends Base {
         if (options?.thumbnail) {
             message[key].jpegThumbnail = Buffer.from(options.thumbnail, 'base64')
         }
+
+        const chat = this.chats.get(id)
+        if (
+            // if we want to send a disappearing message
+            ((options?.sendEphemeral === 'chat' && chat?.ephemeral) || 
+            options?.sendEphemeral === true) &&
+            // and it's not a protocol message -- delete, toggle disappear message
+            key !== 'protocolMessage' &&
+            // already not converted to disappearing message
+            key !== 'ephemeralMessage' 
+        ) {
+            message[key].contextInfo = {
+                ...(message[key].contextInfo || {}),
+                expiration: options.expiration || chat?.ephemeral || WA_DEFAULT_EPHEMERAL,
+                ephemeralSettingTimestamp: options.expiration || chat?.eph_setting_ts
+            }
+            message = {
+                ephemeralMessage: {
+                    message
+                }
+            }
+        } 
         message = WAMessageProto.Message.fromObject (message)
 
         const messageJSON = {
