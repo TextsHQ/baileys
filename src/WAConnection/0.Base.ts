@@ -360,6 +360,7 @@ export class WAConnection extends EventEmitter {
     }
     /** Send some message to the WhatsApp servers */
     protected async send(m) {
+        this.emit('ws-request',m)
         this.conn.send(m)
     }
     protected async waitForConnection () {

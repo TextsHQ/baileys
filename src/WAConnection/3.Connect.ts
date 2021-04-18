@@ -130,6 +130,8 @@ export class WAConnection extends Base {
         }
     }
     private onMessageRecieved(message: string | Buffer) {
+        this.emit('ws-response',message)
+
         if (message[0] === '!') {
             // when the first character in the message is an '!', the server is sending a pong frame
             const timestamp = message.slice(1, message.length).toString ('utf-8')
