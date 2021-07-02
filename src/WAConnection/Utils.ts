@@ -247,7 +247,7 @@ export async function getAudioDuration (buffer: Buffer) {
 export async function generateThumbnail(buffer: Buffer, mediaType: MessageType, info: MessageOptions) {
     if ('thumbnail' in info) {
         // don't do anything if the thumbnail is already provided, or is null
-        if (mediaType === MessageType.audio) {
+        if (mediaType === MessageType.audio && info.thumbnail) {
             throw new Error('audio messages cannot have thumbnails')
         }
     } else if (mediaType === MessageType.image) {
