@@ -44,6 +44,10 @@ export const cleanMessage = (message: proto.IWebMessageInfo, meId: string) => {
 		normaliseKey(content.pollUpdateMessage.pollCreationMessageKey!)
 	}
 
+	if(content?.protocolMessage) {
+		normaliseKey(content.protocolMessage.key!)
+	}
+
 	function normaliseKey(msgKey: proto.IMessageKey) {
 		// if the reaction is from another user
 		// we've to correctly map the key to this user's perspective
@@ -254,7 +258,11 @@ const processMessage = async(
 						...message.key,
 						id: protocolMsg.key!.id
 					},
-					update: { message: null, messageStubType: WAMessageStubType.REVOKE, key: message.key }
+					update: {
+						message: null,
+						messageStubType: WAMessageStubType.REVOKE,
+						key: message.key
+					}
 				}
 			])
 			break
@@ -263,6 +271,17 @@ const processMessage = async(
 				ephemeralSettingTimestamp: toNumber(message.messageTimestamp),
 				ephemeralExpiration: protocolMsg.ephemeralExpiration || null
 			})
+			break
+		case proto.Message.ProtocolMessage.Type.MESSAGE_EDIT:
+			ev.emit(
+				'messages.update',
+				[
+					{
+						key: protocolMsg.key!,
+						update: { message: protocolMsg.editedMessage }
+					}
+				]
+			)
 			break
 		}
 	} else if(content?.reactionMessage) {
