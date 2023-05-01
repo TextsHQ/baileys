@@ -982,6 +982,12 @@ message Message {
         optional ContextInfo contextInfo = 17;
     }
     
+    message ContactMessageV2 {
+        optional string displayName = 1;
+        optional string vcard = 2;
+        optional ContextInfo contextInfo = 3;
+    }
+    
     message ContactsArrayMessage {
         optional string displayName = 1;
         repeated Message.ContactMessage contacts = 2;
