@@ -278,7 +278,15 @@ const processMessage = async(
 				[
 					{
 						key: protocolMsg.key!,
-						update: { message: protocolMsg.editedMessage }
+						update: {
+							message: {
+								editedMessage: {
+									message: protocolMsg.editedMessage
+								}
+							},
+							messageTimestamp: protocolMsg.timestampMs
+								|| message.messageTimestamp
+						}
 					}
 				]
 			)

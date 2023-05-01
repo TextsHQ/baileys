@@ -617,12 +617,12 @@ export const normalizeMessageContent = (content: WAMessageContent | null | undef
 
 	 // set max iterations to prevent an infinite loop
 	 for(let i = 0;i < 5;i++) {
-		 const inner = getFutureProofMessage(content)
-		 if(!inner) {
-			 break
-		 }
+		const inner = getFutureProofMessage(content)
+		if(!inner) {
+			break
+		}
 
-		 content = inner.message
+		content = inner.message
 	 }
 
 	 return content!
