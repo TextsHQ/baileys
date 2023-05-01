@@ -264,6 +264,25 @@ const processMessage = async(
 				ephemeralExpiration: protocolMsg.ephemeralExpiration || null
 			})
 			break
+		case proto.Message.ProtocolMessage.Type.MESSAGE_EDIT:
+			ev.emit(
+				'messages.update',
+				[
+					{
+						key: protocolMsg.key!,
+						update: {
+							message: {
+								editedMessage: {
+									message: protocolMsg.editedMessage
+								}
+							},
+							messageTimestamp: protocolMsg.timestampMs
+								|| message.messageTimestamp
+						}
+					}
+				]
+			)
+			break
 		}
 	} else if(content?.reactionMessage) {
 		const reaction: proto.IReaction = {
