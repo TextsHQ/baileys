@@ -277,7 +277,8 @@ const processMessage = async(
 								}
 							},
 							messageTimestamp: protocolMsg.timestampMs
-								|| message.messageTimestamp
+								? Math.floor(toNumber(protocolMsg.timestampMs) / 1000)
+								: message.messageTimestamp
 						}
 					}
 				]
