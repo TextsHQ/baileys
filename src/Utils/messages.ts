@@ -407,7 +407,7 @@ export const generateWAMessageContent = async(
 			selectableOptionsCount: message.poll.selectableCount,
 			options: message.poll.values.map(optionName => ({ optionName })),
 		}
-	} else if('edit' in message) {
+	} else if('edit' in message && 'newContent' in message) {
 		const editedMessage = await generateWAMessageContent(message.newContent, options)
 		m.protocolMessage = {
 			key: message.edit,
