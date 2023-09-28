@@ -407,7 +407,7 @@ export const generateWAMessageContent = async(
 			selectableOptionsCount: message.poll.selectableCount,
 			options: message.poll.values.map(optionName => ({ optionName })),
 		}
-	} else if('edit' in message) {
+	} else if('edit' in message && 'newContent' in message) {
 		const editedMessage = await generateWAMessageContent(message.newContent, options)
 		m.protocolMessage = {
 			key: message.edit,
@@ -496,6 +496,23 @@ export const generateWAMessageContent = async(
 		m[messageType].contextInfo.mentionedJid = message.mentions
 	}
 
+	if('edit' in message) {
+		m = {
+			protocolMessage: {
+				key: message.edit,
+				editedMessage: m,
+				timestampMs: Date.now(),
+				type: WAProto.Message.ProtocolMessage.Type.MESSAGE_EDIT
+			}
+		}
+	}
+
+	if('contextInfo' in message && !!message.contextInfo) {
+		const [messageType] = Object.keys(m)
+		m[messageType] = m[messageType] || {}
+		m[messageType].contextInfo = message.contextInfo
+	}
+
 	return WAProto.Message.fromObject(m)
 }
 
@@ -534,7 +551,7 @@ export const generateWAMessageFromContent = (
 
 		// if a participant is quoted, then it must be a group
 		// hence, remoteJid of group must also be entered
-		if(quoted.key.participant || quoted.participant) {
+		if(jid !== quoted.key.remoteJid) {
 			contextInfo.remoteJid = quoted.key.remoteJid
 		}
 
@@ -553,11 +570,6 @@ export const generateWAMessageFromContent = (
 			...(message[key].contextInfo || {}),
 			expiration: options.ephemeralExpiration || WA_DEFAULT_EPHEMERAL,
 			//ephemeralSettingTimestamp: options.ephemeralOptions.eph_setting_ts?.toString()
-		}
-		message = {
-			ephemeralMessage: {
-				message
-			}
 		}
 	}
 
@@ -746,7 +758,7 @@ export function getAggregateVotesInPollMessage(
 	{ message, pollUpdates }: Pick<WAMessage, 'pollUpdates' | 'message'>,
 	meId?: string
 ) {
-	const opts = message?.pollCreationMessage?.options || []
+	const opts = message?.pollCreationMessage?.options || message?.pollCreationMessageV2?.options || message?.pollCreationMessageV3?.options || []
 	const voteHashMap = opts.reduce((acc, opt) => {
 		const hash = sha256(Buffer.from(opt.optionName || '')).toString()
 		acc[hash] = {
