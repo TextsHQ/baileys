@@ -180,6 +180,9 @@ export type AnyMessageContent = AnyRegularMessageContent | {
 	delete: WAMessageKey
 } | {
 	disappearingMessagesInChat: boolean | number
+} | {
+    edit: WAMessageKey
+    newContent: AnyRegularMessageContent
 }
 
 export type GroupMetadataParticipants = Pick<GroupMetadata, 'participants'>
