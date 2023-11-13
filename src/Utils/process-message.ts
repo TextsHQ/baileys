@@ -152,6 +152,55 @@ export function decryptPollVote(
 	}
 }
 
+type ReactionContext = {
+	/** normalised jid of the person that created the target message */
+	originalMessageSenderJid: string
+	/** ID of the original message targeted by the reaction */
+	targetMsgId: string
+	/** reaction creation message enc key */
+	messageSecret: Uint8Array
+	/** jid of the person that reacted */
+	authorJid: string
+}
+
+
+/**
+ * Decrypt an encrypted reaction
+ * @param reaction encrypted reaction
+ * @param ctx additional info about the reaction required for decryption
+ * @returns list of SHA256 options
+ */
+export function decryptReaction(
+	{ encPayload, encIv }: proto.Message.IEncReactionMessage,
+	{
+		originalMessageSenderJid,
+		targetMsgId: stanzaId,
+		messageSecret,
+		authorJid,
+	}: ReactionContext
+) {
+
+	const sign = Buffer.concat(
+		[
+			toBinary(stanzaId),
+			toBinary(originalMessageSenderJid),
+			toBinary(authorJid),
+			toBinary('Enc Reaction')
+		]
+	)
+	debugger
+
+	const key0 = hmacSign(messageSecret, new Uint8Array(32), 'sha256')
+	const decKey = hmacSign(sign, key0, 'sha256')
+
+	const decrypted = aesDecryptGCM(encPayload!, decKey, encIv!, undefined)
+	return proto.Message.ReactionMessage.decode(decrypted)
+
+	function toBinary(txt: string) {
+		return Buffer.from(txt)
+	}
+}
+
 const processMessage = async(
 	message: proto.IWebMessageInfo,
 	{
@@ -179,6 +228,9 @@ const processMessage = async(
 	}
 
 	const content = normalizeMessageContent(message.message)
+
+
+	console.log('processMessage', message, content)
 
 	// unarchive chat if it's a real message, or someone reacted to our message
 	// and we've the unarchive chats setting on
@@ -406,6 +458,59 @@ const processMessage = async(
 			logger?.warn(
 				{ creationMsgKey },
 				'poll creation message not found, cannot decrypt update'
+			)
+		}
+	} else if(content?.encReactionMessage) {
+		const targetMessageKey = content.encReactionMessage.targetMessageKey
+		// we need to fetch the target message to get the reaction enc key
+		if(!targetMessageKey) {
+			return
+		}
+
+		const targetMessage = await getMessage(targetMessageKey)
+		console.log({ targetMessage })
+		debugger
+		if(targetMessage) {
+			const meIdNormalised = jidNormalizedUser(meId)
+			const originalMessageSenderJid = getKeyAuthor(targetMessageKey, meIdNormalised)
+			const authorJid = getKeyAuthor(message.key!, meIdNormalised)
+			const messageSecret = targetMessage.messageContextInfo?.messageSecret!
+
+			try {
+				const reactionMsg = decryptReaction(
+					content.encReactionMessage,
+					{
+						messageSecret,
+						originalMessageSenderJid,
+						targetMsgId: targetMessageKey.id!,
+						authorJid,
+					}
+				)
+				console.log({ reactionMsg })
+				// ev.emit('messages.update', [
+				// 	{
+				// 		key: targetMessageKey,
+				// 		update: {
+				// 			pollUpdates: [
+				// 				{
+				// 					pollUpdateMessageKey: message.key,
+				// 					vote: voteMsg,
+				// 					senderTimestampMs: message.messageTimestamp,
+				// 				}
+				// 			]
+				// 		}
+				// 	}
+				// ])
+			} catch(err) {
+				logger?.warn(
+					{ err, targetMessageKey },
+					'failed to decrypt reaction'
+				)
+			}
+		} else {
+			logger?.warn(
+				{ targetMessageKey },
+				'reaction creation message not found, cannot decrypt update'
 			)
 		}
 	}

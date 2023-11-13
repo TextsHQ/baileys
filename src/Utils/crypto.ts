@@ -62,13 +62,19 @@ export function aesEncryptGCM(plaintext: Uint8Array, key: Uint8Array, iv: Uint8A
  * decrypt AES 256 GCM;
  * where the auth tag is suffixed to the ciphertext
  * */
-export function aesDecryptGCM(ciphertext: Uint8Array, key: Uint8Array, iv: Uint8Array, additionalData: Uint8Array) {
+
+// secret, iv, data, additionalAuthenticatedData
+export function aesDecryptGCM(ciphertext: Uint8Array, key: Uint8Array, iv: Uint8Array, additionalAuthenticatedData?: Uint8Array) {
 	const decipher = createDecipheriv('aes-256-gcm', key, iv)
 	// decrypt additional adata
 	const enc = ciphertext.slice(0, ciphertext.length - GCM_TAG_LENGTH)
 	const tag = ciphertext.slice(ciphertext.length - GCM_TAG_LENGTH)
-	// set additional data
-	decipher.setAAD(additionalData)
+
+	// set additional authenticated data (if any, as it is optional)
+	if(additionalAuthenticatedData) {
+		decipher.setAAD(additionalAuthenticatedData)
+	}
+
 	decipher.setAuthTag(tag)
 
 	return Buffer.concat([ decipher.update(enc), decipher.final() ])
