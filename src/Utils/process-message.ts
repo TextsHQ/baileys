@@ -4,7 +4,7 @@ import { proto } from '../../WAProto'
 import { AuthenticationCreds, BaileysEventEmitter, Chat, GroupMetadata, ParticipantAction, SignalKeyStoreWithTransaction, SocketConfig, WAMessageStubType } from '../Types'
 import { getContentType, normalizeMessageContent } from '../Utils/messages'
 import { areJidsSameUser, isJidBroadcast, isJidStatusBroadcast, jidNormalizedUser } from '../WABinary'
-import { aesDecryptGCM, hmacSign } from './crypto'
+import { aesDecryptGCM, hkdf, hkdfExpand, hmacSign, sha256 } from './crypto'
 import { getKeyAuthor, toNumber } from './generics'
 import { downloadAndProcessHistorySyncNotification } from './history'
 
@@ -38,6 +38,10 @@ export const cleanMessage = (message: proto.IWebMessageInfo, meId: string) => {
 	// if the message has a reaction, ensure fromMe & remoteJid are from our perspective
 	if(content?.reactionMessage) {
 		normaliseKey(content.reactionMessage.key!)
+	}
+
+	if(content?.encReactionMessage) {
+		normaliseKey(content.encReactionMessage.targetMessageKey!)
 	}
 
 	if(content?.pollUpdateMessage) {
@@ -154,13 +158,13 @@ export function decryptPollVote(
 
 type ReactionContext = {
 	/** normalised jid of the person that created the target message */
-	originalMessageSenderJid: string
+	parentMsgOriginalSenderJid: string
 	/** ID of the original message targeted by the reaction */
 	targetMsgId: string
 	/** reaction creation message enc key */
 	messageSecret: Uint8Array
-	/** jid of the person that reacted */
-	authorJid: string
+	/** lid of the person that reacted */
+	modificationSenderLid: string
 }
 
 
@@ -173,27 +177,28 @@ type ReactionContext = {
 export function decryptReaction(
 	{ encPayload, encIv }: proto.Message.IEncReactionMessage,
 	{
-		originalMessageSenderJid,
+		parentMsgOriginalSenderJid,
 		targetMsgId: stanzaId,
 		messageSecret,
-		authorJid,
+		modificationSenderLid,
 	}: ReactionContext
 ) {
 
+	const modificationType = 'Enc Reaction'
 	const sign = Buffer.concat(
 		[
 			toBinary(stanzaId),
-			toBinary(originalMessageSenderJid),
-			toBinary(authorJid),
-			toBinary('Enc Reaction')
+			toBinary(parentMsgOriginalSenderJid),
+			toBinary(modificationSenderLid),
+			toBinary(modificationType)
 		]
 	)
-	debugger
 
-	const key0 = hmacSign(messageSecret, new Uint8Array(32), 'sha256')
-	const decKey = hmacSign(sign, key0, 'sha256')
+	const key0 = hmacSign(messageSecret, new Uint8Array(32), 'sha256') // OK
+	const decKey = hkdfExpand(key0, sign, 32)
 
 	const decrypted = aesDecryptGCM(encPayload!, decKey, encIv!, undefined)
+
 	return proto.Message.ReactionMessage.decode(decrypted)
 
 	function toBinary(txt: string) {
@@ -229,8 +234,6 @@ const processMessage = async(
 
 	const content = normalizeMessageContent(message.message)
 
-
-	console.log('processMessage', message, content)
 
 	// unarchive chat if it's a real message, or someone reacted to our message
 	// and we've the unarchive chats setting on
@@ -468,39 +471,29 @@ const processMessage = async(
 		}
 
 		const targetMessage = await getMessage(targetMessageKey)
-		console.log({ targetMessage })
-		debugger
+
 		if(targetMessage) {
 			const meIdNormalised = jidNormalizedUser(meId)
 			const originalMessageSenderJid = getKeyAuthor(targetMessageKey, meIdNormalised)
-			const authorJid = getKeyAuthor(message.key!, meIdNormalised)
+			const modificationSenderJid = getKeyAuthor(message.key!, meIdNormalised)
+			const modificationSenderLid = modificationSenderJid.replace('@s.whatsapp.net', '@lid') // TMP hack
 			const messageSecret = targetMessage.messageContextInfo?.messageSecret!
 
 			try {
-				const reactionMsg = decryptReaction(
+				const reaction = decryptReaction(
 					content.encReactionMessage,
 					{
 						messageSecret,
-						originalMessageSenderJid,
+						parentMsgOriginalSenderJid: originalMessageSenderJid,
 						targetMsgId: targetMessageKey.id!,
-						authorJid,
+						modificationSenderLid,
 					}
 				)
-				console.log({ reactionMsg })
-				// ev.emit('messages.update', [
-				// 	{
-				// 		key: targetMessageKey,
-				// 		update: {
-				// 			pollUpdates: [
-				// 				{
-				// 					pollUpdateMessageKey: message.key,
-				// 					vote: voteMsg,
-				// 					senderTimestampMs: message.messageTimestamp,
-				// 				}
-				// 			]
-				// 		}
-				// 	}
-				// ])
+				console.log({reaction})
+				ev.emit('messages.reaction', [{
+					reaction,
+					key: content.encReactionMessage.targetMessageKey!,
+				}])
 			} catch(err) {
 				logger?.warn(
 					{ err, targetMessageKey },
