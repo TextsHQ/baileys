@@ -475,8 +475,7 @@ const processMessage = async(
 		if(targetMessage) {
 			const meIdNormalised = jidNormalizedUser(meId)
 			const originalMessageSenderJid = getKeyAuthor(targetMessageKey, meIdNormalised)
-			const modificationSenderJid = getKeyAuthor(message.key!, meIdNormalised)
-			const modificationSenderLid = modificationSenderJid.replace('@s.whatsapp.net', '@lid') // TMP hack
+			const modificationSenderLid = message.key.participant!
 			const messageSecret = targetMessage.messageContextInfo?.messageSecret!
 
 			try {
@@ -491,8 +490,8 @@ const processMessage = async(
 				)
 				console.log({reaction})
 				ev.emit('messages.reaction', [{
-					reaction,
-					key: content.encReactionMessage.targetMessageKey!,
+					reaction: { ...reaction, key: message.key },
+					key: targetMessageKey,
 				}])
 			} catch(err) {
 				logger?.warn(
