@@ -457,6 +457,12 @@ export const generateWAMessageContent = async(
 			type: WAProto.Message.ProtocolMessage.Type.MESSAGE_EDIT,
 			timestampMs: Date.now()
 		}
+	} else if('sharePhoneNumber' in message) {
+		m.protocolMessage = {
+			type: proto.Message.ProtocolMessage.Type.SHARE_PHONE_NUMBER
+		}
+	} else if('requestPhoneNumber' in message) {
+		m.requestPhoneNumberMessage = {}
 	} else {
 		m = await prepareWAMessageMedia(
 			message,
