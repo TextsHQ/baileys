@@ -488,7 +488,7 @@ const processMessage = async(
 						modificationSenderLid,
 					}
 				)
-				console.log({reaction})
+
 				ev.emit('messages.reaction', [{
 					reaction: { ...reaction, key: message.key },
 					key: targetMessageKey,
