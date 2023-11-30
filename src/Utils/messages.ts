@@ -694,6 +694,7 @@ export const normalizeMessageContent = (content: WAMessageContent | null | undef
 			 || message?.documentWithCaptionMessage
 			 || message?.viewOnceMessageV2
 			 || message?.editedMessage
+			 || message?.groupMentionedMessage
 		 )
 	 }
 }
