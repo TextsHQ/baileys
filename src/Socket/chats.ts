@@ -612,9 +612,6 @@ export const makeChatsSocket = (config: SocketConfig) => {
 		} else if(Array.isArray(content)) {
 			const [firstChild] = content
 			let type = firstChild.tag as WAPresence
-			if(type === 'paused') {
-				type = 'available'
-			}
 
 			if(firstChild.attrs?.media === 'audio') {
 				type = 'recording'
