@@ -347,6 +347,30 @@ const processMessage = async(
 				]
 			)
 			break
+		case proto.Message.ProtocolMessage.Type.PEER_DATA_OPERATION_REQUEST_RESPONSE_MESSAGE:
+			const response = protocolMsg.peerDataOperationRequestResponseMessage!
+			if(response) {
+				const { peerDataOperationResult } = response
+
+				for(const result of peerDataOperationResult!) {
+					const { placeholderMessageResendResponse } = result
+
+					if(placeholderMessageResendResponse) {
+						const { webMessageInfoBytes } = placeholderMessageResendResponse
+						const webMessageInfo = proto.WebMessageInfo.decode(webMessageInfoBytes!)
+						ev.emit('messages.update', [
+							{
+								key: webMessageInfo.key,
+								update: {
+									message: webMessageInfo.message
+								}
+							}
+						])
+					}
+				}
+			}
+
+			break
 		}
 	} else if(content?.reactionMessage) {
 		const reaction: proto.IReaction = {
