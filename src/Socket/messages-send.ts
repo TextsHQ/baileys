@@ -742,19 +742,10 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 						...options,
 					}
 				)
-				const isDeleteMsg = 'delete' in content && !!content.delete
-				const isEditMsg = 'edit' in content && !!content.edit
 				const additionalAttributes: BinaryNodeAttributes = { }
-				// required for delete
-				if(isDeleteMsg) {
-					// if the chat is a group, and I am not the author, then delete the message as an admin
-					if(isJidGroup(content.delete?.remoteJid as string) && !content.delete?.fromMe) {
-						additionalAttributes.edit = '8'
-					} else {
-						additionalAttributes.edit = '7'
-					}
-				} else if(isEditMsg) {
-					additionalAttributes.edit = '1'
+				const flag = getEditFlag(fullMsg.message)
+				if(flag) {
+					additionalAttributes.edit = flag
 				}
 
 				await relayMessage(jid, fullMsg.message!, { messageId: fullMsg.key.id!, cachedGroupMetadata: options.cachedGroupMetadata, additionalAttributes, statusJidList: options.statusJidList })
