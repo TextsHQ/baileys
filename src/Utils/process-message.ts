@@ -309,14 +309,10 @@ const processMessage = async(
 		case proto.Message.ProtocolMessage.Type.REVOKE:
 			ev.emit('messages.update', [
 				{
-					key: {
-						...message.key,
-						id: protocolMsg.key!.id
-					},
+					key: protocolMsg.key!,
 					update: {
 						message: null,
-						messageStubType: WAMessageStubType.REVOKE,
-						key: message.key
+						messageStubType: WAMessageStubType.REVOKE
 					}
 				}
 			])
