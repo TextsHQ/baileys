@@ -187,7 +187,7 @@ export const decryptMessageNode = (
 							'failed to decrypt message'
 						)
 						fullMessage.messageStubType = proto.WebMessageInfo.StubType.CIPHERTEXT
-						fullMessage.messageStubParameters = [err.message]
+						fullMessage.messageStubParameters = [err.message, 'decryptMessageNode']
 					}
 				}
 			}
