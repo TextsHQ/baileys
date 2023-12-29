@@ -720,7 +720,7 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 
 					cleanMessage(msg, authState.creds.me!.id)
 
-					await upsertMessage(msg, node.attrs.offline ? 'append' : 'notify')
+					await upsertMessage({ ...msg, node }, node.attrs.offline ? 'append' : 'notify')
 				}
 			),
 			sendMessageAck(node)
