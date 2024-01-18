@@ -2,12 +2,12 @@ import { Boom } from '@hapi/boom'
 import { Logger } from 'pino'
 import { proto } from '../../WAProto'
 import { SignalRepository, WAMessageKey } from '../Types'
-import { areJidsSameUser, BinaryNode, isJidBroadcast, isJidGroup, isJidStatusBroadcast, isJidUser, isLidUser } from '../WABinary'
+import { areJidsSameUser, BinaryNode, isJidBroadcast, isJidGroup, isJidNewsletter, isJidStatusBroadcast, isJidUser, isLidUser } from '../WABinary'
 import { unpadRandomMax16 } from './generics'
 
 const NO_MESSAGE_FOUND_ERROR_TEXT = 'Message absent from node'
 
-type MessageType = 'chat' | 'peer_broadcast' | 'other_broadcast' | 'group' | 'direct_peer_status' | 'other_status'
+type MessageType = 'chat' | 'peer_broadcast' | 'other_broadcast' | 'group' | 'direct_peer_status' | 'other_status' | 'newsletter'
 
 /**
  * Decode the received node as a message.
@@ -78,6 +78,10 @@ export function decodeMessageNode(
 
 		chatId = from
 		author = participant
+	} else if(isJidNewsletter(from)) {
+		msgType = 'newsletter'
+		chatId = from
+		author = from
 	} else {
 		throw new Boom('Unknown message type', { data: stanza })
 	}
@@ -132,7 +136,21 @@ export const decryptMessageNode = (
 						fullMessage.verifiedBizName = details.verifiedName
 					}
 
-					if(tag !== 'enc') {
+					if(tag === 'plaintext') {
+						// plaintext messages are used for newsletter (whatsapp channel) messages
+						if(content instanceof Uint8Array) {
+							try {
+								fullMessage.message = proto.Message.decode(content)
+							} catch(err) {
+								logger.error(
+									{ key: fullMessage.key, err },
+									'failed to decode plaintext message'
+								)
+								fullMessage.messageStubType = proto.WebMessageInfo.StubType.CIPHERTEXT
+								fullMessage.messageStubParameters = [err.message, 'plaintext']
+							}
+						}
+					} else if(tag !== 'enc') {
 						continue
 					}
 
