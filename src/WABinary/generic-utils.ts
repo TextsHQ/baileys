@@ -119,3 +119,23 @@ export function binaryNodeToString(node: BinaryNode | BinaryNode['content'], i =
 
 	return tag + content
 }
+
+function toCamelCase(str) {
+	return str.replace(/([-_][a-z])/g, (group) => group.toUpperCase().replace('-', '').replace('_', ''))
+}
+
+export function convertKeysToCamelCase(obj) {
+	if(typeof obj !== 'object' || obj === null) {
+		return obj
+	}
+
+	if(Array.isArray(obj)) {
+		return obj.map((v) => convertKeysToCamelCase(v))
+	}
+
+	return Object.keys(obj).reduce((result, key) => {
+		const camelCaseKey = toCamelCase(key)
+		result[camelCaseKey] = convertKeysToCamelCase(obj[key])
+		return result
+	}, {})
+}
