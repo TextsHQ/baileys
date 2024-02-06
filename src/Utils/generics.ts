@@ -304,22 +304,90 @@ const CODE_MAP: { [_: string]: DisconnectReason } = {
 	conflict: DisconnectReason.connectionReplaced
 }
 
+const parseStreamError = (node: BinaryNode) => {
+	const [childNode] = getAllBinaryNodeChildren(node)
+
+	if(childNode?.tag !== 'conflict') {
+		if(node.attrs.code) {
+			return {
+				type: 'code',
+				code: +node.attrs.code
+			}
+		} else if(childNode?.tag === 'ack') {
+			return {
+				type: 'ack',
+				id: childNode.attrs.id || null
+			}
+		} else if(childNode?.tag === 'xml-not-well-formed') {
+			return {
+				type: 'xml-not-well-formed'
+			}
+		} else {
+			return {
+				type: 'other'
+			}
+		}
+	}
+
+	switch (childNode?.attrs.type) {
+	case 'replaced':
+		return { type: 'replaced' }
+	case 'device_removed':
+		return { type: 'device_removed' }
+	default:
+		return { type: 'device_removed' }
+	}
+}
+
 /**
  * Stream errors generally provide a reason, map that to a baileys DisconnectReason
  * @param reason the string reason given, eg. "conflict"
  */
 export const getErrorCodeFromStreamError = (node: BinaryNode) => {
-	const [reasonNode] = getAllBinaryNodeChildren(node)
-	let reason = reasonNode?.tag || 'unknown'
-	const statusCode = +(node.attrs.code || CODE_MAP[reason] || DisconnectReason.badSession)
+	const { type, code } = parseStreamError(node)
+	if(type === 'code' && code && code >= 500 && code < 600) {
+		if(code === DisconnectReason.restartRequired) {
+			return {
+				reason: 'restart required',
+				statusCode: DisconnectReason.restartRequired
+			}
+		}
 
-	if(statusCode === DisconnectReason.restartRequired) {
-		reason = 'restart required'
+		if(code === 516) {
+			return {
+				reason: 'uknown',
+				statusCode: DisconnectReason.badSession
+			}
+		}
+	} else {
+		switch (type) {
+		case 'device_removed':
+			return {
+				reason: 'multidevice mismatch',
+				statusCode: DisconnectReason.multideviceMismatch
+			}
+		case 'replaced':
+			return {
+				reason: 'connection replaced',
+				statusCode: DisconnectReason.connectionReplaced
+			}
+		case 'ack':
+			// This is a tentative fix, we don't know if we can restart after an ack
+			return {
+				reason: 'ack',
+				statusCode: DisconnectReason.restartRequired
+			}
+		case 'xml-not-well-formed':
+			return {
+				reason: 'xml not well formed',
+				statusCode: DisconnectReason.restartRequired
+			}
+		}
 	}
 
 	return {
-		reason,
-		statusCode
+		reason: 'uknown type',
+		statusCode: DisconnectReason.badSession
 	}
 }
 
