@@ -19,7 +19,15 @@ import { generateMessageID } from './generics'
 
 const getTmpFilesDirectory = () => tmpdir()
 
+let imageLib: {
+	sharp?: any
+	jimp?: any
+} | null = null
 const getImageProcessingLibrary = async() => {
+	if(imageLib) {
+		return imageLib
+	}
+
 	const [_jimp, sharp] = await Promise.all([
 		(async() => {
 			const jimp = await (
@@ -38,12 +46,14 @@ const getImageProcessingLibrary = async() => {
 	])
 
 	if(sharp) {
-		return { sharp }
+		imageLib = { sharp }
+		return imageLib
 	}
 
 	const jimp = _jimp?.default || _jimp
 	if(jimp) {
-		return { jimp }
+		imageLib = { jimp }
+		return imageLib
 	}
 
 	throw new Boom('No image processing library available')
@@ -160,6 +170,7 @@ export const generateProfilePicture = async(mediaUpload: WAMediaUpload) => {
 				quality: 50,
 			})
 			.toBuffer()
+
 	} else if('jimp' in lib && typeof lib.jimp?.read === 'function') {
 		const { read, MIME_JPEG, RESIZE_BILINEAR } = lib.jimp
 		const jimp = await read(bufferOrFilePath as any)
