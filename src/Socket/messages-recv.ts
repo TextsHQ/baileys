@@ -857,21 +857,85 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 		}
 	}
 
+	type MessageType = 'message' | 'call' | 'receipt' | 'notification'
+
+	type OfflineNode = {
+		type: MessageType
+		node: BinaryNode
+	}
+
+	const makeOfflineNodeProcessor = () => {
+		const nodeProcessorMap: Map<MessageType, (node: BinaryNode) => Promise<void>> = new Map([
+			['message', handleMessage],
+			['call', handleCall],
+			['receipt', handleReceipt],
+			['notification', handleNotification]
+		])
+		let nodes: OfflineNode[] = []
+		let isProcessing = false
+
+		const enqueue = (type: MessageType, node: BinaryNode) => {
+			nodes.push({ type, node })
+
+			if (isProcessing) {
+				return
+			}
+
+			isProcessing = true
+
+			let promise = async () => {
+				while (nodes.length && ws.isOpen) {
+					const { type, node } = nodes.shift()!
+
+					const nodeProcessor = nodeProcessorMap.get(type)
+
+					if (!nodeProcessor) {
+						onUnexpectedError(
+							new Error(`unknown offline node type: ${type}`),
+							'processing offline node'
+						)
+						continue
+					}
+
+					await nodeProcessor(node)
+				}
+
+				isProcessing = false
+			}
+
+			promise().catch(error => onUnexpectedError(error, 'processing offline nodes'))
+		}
+
+		return { enqueue }
+	}
+
+	const offlineNodeProcessor = makeOfflineNodeProcessor()
+
+	const processNodeBufferedWhenRequired = (type: MessageType, node: BinaryNode, identifier: string, exec: (node: BinaryNode) => Promise<void>) => {
+		const isOffline = !!node.attrs.offline
+
+		if(isOffline) {
+			offlineNodeProcessor.enqueue(type, node)
+		} else {
+			processNodeWithBuffer(node, identifier, exec)
+		}
+	}
+	
 	// recv a message
 	ws.on('CB:message', (node: BinaryNode) => {
-		processNodeWithBuffer(node, 'processing message', handleMessage)
+		processNodeBufferedWhenRequired('message', node, 'processing message', handleMessage)
 	})
 
 	ws.on('CB:call', async(node: BinaryNode) => {
-		processNodeWithBuffer(node, 'handling call', handleCall)
+		processNodeBufferedWhenRequired('call', node, 'handling call', handleCall)
 	})
 
 	ws.on('CB:receipt', node => {
-		processNodeWithBuffer(node, 'handling receipt', handleReceipt)
+		processNodeBufferedWhenRequired('receipt', node, 'handling receipt', handleReceipt)
 	})
 
 	ws.on('CB:notification', async(node: BinaryNode) => {
-		processNodeWithBuffer(node, 'handling notification', handleNotification)
+		processNodeBufferedWhenRequired('notification', node, 'handling notification', handleNotification)
 	})
 
 	ws.on('CB:ack,class:message', (node: BinaryNode) => {
