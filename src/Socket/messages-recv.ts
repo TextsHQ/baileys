@@ -871,25 +871,25 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 			['receipt', handleReceipt],
 			['notification', handleNotification]
 		])
-		let nodes: OfflineNode[] = []
+		const nodes: OfflineNode[] = []
 		let isProcessing = false
 
 		const enqueue = (type: MessageType, node: BinaryNode) => {
 			nodes.push({ type, node })
 
-			if (isProcessing) {
+			if(isProcessing) {
 				return
 			}
 
 			isProcessing = true
 
-			let promise = async () => {
-				while (nodes.length && ws.isOpen) {
+			const promise = async() => {
+				while(nodes.length && ws.isOpen) {
 					const { type, node } = nodes.shift()!
 
 					const nodeProcessor = nodeProcessorMap.get(type)
 
-					if (!nodeProcessor) {
+					if(!nodeProcessor) {
 						onUnexpectedError(
 							new Error(`unknown offline node type: ${type}`),
 							'processing offline node'
@@ -920,7 +920,7 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 			processNodeWithBuffer(node, identifier, exec)
 		}
 	}
-	
+
 	// recv a message
 	ws.on('CB:message', (node: BinaryNode) => {
 		processNodeBufferedWhenRequired('message', node, 'processing message', handleMessage)
