@@ -911,7 +911,7 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 
 	const offlineNodeProcessor = makeOfflineNodeProcessor()
 
-	const processNodeBufferedWhenRequired = (type: MessageType, node: BinaryNode, identifier: string, exec: (node: BinaryNode) => Promise<void>) => {
+	const processNode = (type: MessageType, node: BinaryNode, identifier: string, exec: (node: BinaryNode) => Promise<void>) => {
 		const isOffline = !!node.attrs.offline
 
 		if(isOffline) {
@@ -923,19 +923,19 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 
 	// recv a message
 	ws.on('CB:message', (node: BinaryNode) => {
-		processNodeBufferedWhenRequired('message', node, 'processing message', handleMessage)
+		processNode('message', node, 'processing message', handleMessage)
 	})
 
 	ws.on('CB:call', async(node: BinaryNode) => {
-		processNodeBufferedWhenRequired('call', node, 'handling call', handleCall)
+		processNode('call', node, 'handling call', handleCall)
 	})
 
 	ws.on('CB:receipt', node => {
-		processNodeBufferedWhenRequired('receipt', node, 'handling receipt', handleReceipt)
+		processNode('receipt', node, 'handling receipt', handleReceipt)
 	})
 
 	ws.on('CB:notification', async(node: BinaryNode) => {
-		processNodeBufferedWhenRequired('notification', node, 'handling notification', handleNotification)
+		processNode('notification', node, 'handling notification', handleNotification)
 	})
 
 	ws.on('CB:ack,class:message', (node: BinaryNode) => {
