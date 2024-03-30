@@ -1,6 +1,8 @@
 import { makeLibSignalRepository } from '../Signal/libsignal'
-import { SignalAuthState, SignalDataTypeMap } from '../Types'
-import { Curve, generateRegistrationId, generateSignalPubKey, signedKeyPair } from '../Utils'
+import { SignalAuthState, SignalDataTypeMap, SignalKeyStore } from '../Types'
+import { addTransactionCapability, Curve, generateRegistrationId, generateSignalPubKey, signedKeyPair } from '../Utils'
+import logger from '../Utils/logger'
+import { makeMockSignalKeyStore } from './utils'
 
 describe('Signal Tests', () => {
 
@@ -72,12 +74,16 @@ describe('Signal Tests', () => {
 		const msg = Buffer.from('hello there!')
 
 		const sender = participants[0]
-		const enc = await sender.repository.encryptGroupMessage(
-			{
-				group: groupId,
-				meId: sender.jid,
-				data: msg
-			}
+		const enc = await sender.store.keys['transaction'](
+			() => (
+				sender.repository.encryptGroupMessage(
+					{
+						group: groupId,
+						meId: sender.jid,
+						data: msg
+					}
+				)
+			)
 		)
 
 		for(const participant of participants) {
@@ -85,24 +91,28 @@ describe('Signal Tests', () => {
 				continue
 			}
 
-			await participant.repository.processSenderKeyDistributionMessage(
-				{
-					item: {
-						groupId,
-						axolotlSenderKeyDistributionMessage: enc.senderKeyDistributionMessage
-					},
-					authorJid: sender.jid
-				}
-			)
+			await participant.store.keys['transaction'](
+				async() => {
+					await participant.repository.processSenderKeyDistributionMessage(
+						{
+							item: {
+								groupId,
+								axolotlSenderKeyDistributionMessage: enc.senderKeyDistributionMessage
+							},
+							authorJid: sender.jid
+						}
+					)
 
-			const dec = await participant.repository.decryptGroupMessage(
-				{
-					group: groupId,
-					authorJid: sender.jid,
-					msg: enc.ciphertext
+					const dec = await participant.repository.decryptGroupMessage(
+						{
+							group: groupId,
+							authorJid: sender.jid,
+							msg: enc.ciphertext
+						}
+					)
+					expect(dec).toEqual(msg)
 				}
 			)
-			expect(dec).toEqual(msg)
 		}
 	})
 })
@@ -150,34 +160,21 @@ async function prepareForSendingMessage(
 
 function makeTestAuthState(): SignalAuthState {
 	const identityKey = Curve.generateKeyPair()
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	const store: { [_: string]: any } = {}
+
 	return {
 		creds: {
 			signedIdentityKey: identityKey,
 			registrationId: generateRegistrationId(),
 			signedPreKey: signedKeyPair(identityKey, 1),
 		},
-		keys: {
-			get(type, ids) {
-				const data: { [_: string]: SignalDataTypeMap[typeof type] } = { }
-				for(const id of ids) {
-					const item = store[getUniqueId(type, id)]
-					if(typeof item !== 'undefined') {
-						data[id] = item
-					}
-				}
-
-				return data
-			},
-			set(data) {
-				for(const type in data) {
-					for(const id in data[type]) {
-						store[getUniqueId(type, id)] = data[type][id]
-					}
-				}
-			},
-		}
+		keys: addTransactionCapability(
+			makeMockSignalKeyStore(),
+			logger,
+			{
+				maxCommitRetries: 1,
+				delayBetweenTriesMs: 100
+			}
+		)
 	}
 
 	function getUniqueId(type: string, id: string) {

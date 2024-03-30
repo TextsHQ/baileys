@@ -12515,6 +12515,108 @@ export namespace proto {
             public toJSON(): { [k: string]: any };
         }
 
+        /** Properties of a ContactMessageV2. */
+        interface IContactMessageV2 {
+
+            /** ContactMessageV2 displayName */
+            displayName?: (string|null);
+
+            /** ContactMessageV2 vcard */
+            vcard?: (string|null);
+
+            /** ContactMessageV2 contextInfo */
+            contextInfo?: (proto.IContextInfo|null);
+        }
+
+        /** Represents a ContactMessageV2. */
+        class ContactMessageV2 implements IContactMessageV2 {
+
+            /**
+             * Constructs a new ContactMessageV2.
+             * @param [properties] Properties to set
+             */
+            constructor(properties?: proto.Message.IContactMessageV2);
+
+            /** ContactMessageV2 displayName. */
+            public displayName: string;
+
+            /** ContactMessageV2 vcard. */
+            public vcard: string;
+
+            /** ContactMessageV2 contextInfo. */
+            public contextInfo?: (proto.IContextInfo|null);
+
+            /**
+             * Creates a new ContactMessageV2 instance using the specified properties.
+             * @param [properties] Properties to set
+             * @returns ContactMessageV2 instance
+             */
+            public static create(properties?: proto.Message.IContactMessageV2): proto.Message.ContactMessageV2;
+
+            /**
+             * Encodes the specified ContactMessageV2 message. Does not implicitly {@link proto.Message.ContactMessageV2.verify|verify} messages.
+             * @param message ContactMessageV2 message or plain object to encode
+             * @param [writer] Writer to encode to
+             * @returns Writer
+             */
+            public static encode(message: proto.Message.IContactMessageV2, writer?: $protobuf.Writer): $protobuf.Writer;
+
+            /**
+             * Encodes the specified ContactMessageV2 message, length delimited. Does not implicitly {@link proto.Message.ContactMessageV2.verify|verify} messages.
+             * @param message ContactMessageV2 message or plain object to encode
+             * @param [writer] Writer to encode to
+             * @returns Writer
+             */
+            public static encodeDelimited(message: proto.Message.IContactMessageV2, writer?: $protobuf.Writer): $protobuf.Writer;
+
+            /**
+             * Decodes a ContactMessageV2 message from the specified reader or buffer.
+             * @param reader Reader or buffer to decode from
+             * @param [length] Message length if known beforehand
+             * @returns ContactMessageV2
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            public static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): proto.Message.ContactMessageV2;
+
+            /**
+             * Decodes a ContactMessageV2 message from the specified reader or buffer, length delimited.
+             * @param reader Reader or buffer to decode from
+             * @returns ContactMessageV2
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            public static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): proto.Message.ContactMessageV2;
+
+            /**
+             * Verifies a ContactMessageV2 message.
+             * @param message Plain object to verify
+             * @returns `null` if valid, otherwise the reason why it is not
+             */
+            public static verify(message: { [k: string]: any }): (string|null);
+
+            /**
+             * Creates a ContactMessageV2 message from a plain object. Also converts values to their respective internal types.
+             * @param object Plain object
+             * @returns ContactMessageV2
+             */
+            public static fromObject(object: { [k: string]: any }): proto.Message.ContactMessageV2;
+
+            /**
+             * Creates a plain object from a ContactMessageV2 message. Also converts values to other types if specified.
+             * @param message ContactMessageV2
+             * @param [options] Conversion options
+             * @returns Plain object
+             */
+            public static toObject(message: proto.Message.ContactMessageV2, options?: $protobuf.IConversionOptions): { [k: string]: any };
+
+            /**
+             * Converts this ContactMessageV2 to JSON.
+             * @returns JSON object
+             */
+            public toJSON(): { [k: string]: any };
+        }
+
         /** Properties of a ContactsArrayMessage. */
         interface IContactsArrayMessage {
 

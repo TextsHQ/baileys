@@ -24,7 +24,7 @@ export const makeGroupsSocket = (config: SocketConfig) => {
 		const result = await groupQuery(
 			jid,
 			'get',
-			[ { tag: 'query', attrs: { request: 'interactive' } } ]
+			[ { tag: 'query', attrs: {} } ]
 		)
 		return extractGroupMetadata(result)
 	}

@@ -1,5 +1,5 @@
 import { Boom } from '@hapi/boom'
-import { AxiosRequestConfig } from 'axios'
+import axios, { AxiosRequestConfig } from 'axios'
 import { exec } from 'child_process'
 import * as Crypto from 'crypto'
 import { once } from 'events'
@@ -19,7 +19,15 @@ import { generateMessageID } from './generics'
 
 const getTmpFilesDirectory = () => tmpdir()
 
+let imageLib: {
+	sharp?: any
+	jimp?: any
+} | null = null
 const getImageProcessingLibrary = async() => {
+	if(imageLib) {
+		return imageLib
+	}
+
 	const [_jimp, sharp] = await Promise.all([
 		(async() => {
 			const jimp = await (
@@ -38,12 +46,14 @@ const getImageProcessingLibrary = async() => {
 	])
 
 	if(sharp) {
-		return { sharp }
+		imageLib = { sharp }
+		return imageLib
 	}
 
 	const jimp = _jimp?.default || _jimp
 	if(jimp) {
-		return { jimp }
+		imageLib = { jimp }
+		return imageLib
 	}
 
 	throw new Boom('No image processing library available')
@@ -160,6 +170,7 @@ export const generateProfilePicture = async(mediaUpload: WAMediaUpload) => {
 				quality: 50,
 			})
 			.toBuffer()
+
 	} else if('jimp' in lib && typeof lib.jimp?.read === 'function') {
 		const { read, MIME_JPEG, RESIZE_BILINEAR } = lib.jimp
 		const jimp = await read(bufferOrFilePath as any)
@@ -324,7 +335,6 @@ export async function generateThumbnail(
 }
 
 export const getHttpStream = async(url: string | URL, options: AxiosRequestConfig & { isStream?: true } = {}) => {
-	const { default: axios } = await import('axios')
 	const fetched = await axios.get(url.toString(), { ...options, responseType: 'stream' })
 	return fetched.data as Readable
 }
@@ -602,7 +612,6 @@ export const getWAUploadToServer = (
 	refreshMediaConn: (force: boolean) => Promise<MediaConnInfo>,
 ): WAMediaUploadFunction => {
 	return async(stream, { mediaType, fileEncSha256B64, timeoutMs }) => {
-		const { default: axios } = await import('axios')
 		// send a query JSON to obtain the url & auth token to upload our media
 		let uploadInfo = await refreshMediaConn(false)
 

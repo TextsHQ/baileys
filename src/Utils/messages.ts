@@ -449,6 +449,20 @@ export const generateWAMessageContent = async(
 			selectableOptionsCount: message.poll.selectableCount,
 			options: message.poll.values.map(optionName => ({ optionName })),
 		}
+	} else if('edit' in message && 'newContent' in message) {
+		const editedMessage = await generateWAMessageContent(message.newContent, options)
+		m.protocolMessage = {
+			key: message.edit,
+			editedMessage,
+			type: WAProto.Message.ProtocolMessage.Type.MESSAGE_EDIT,
+			timestampMs: Date.now()
+		}
+	} else if('sharePhoneNumber' in message) {
+		m.protocolMessage = {
+			type: proto.Message.ProtocolMessage.Type.SHARE_PHONE_NUMBER
+		}
+	} else if('requestPhoneNumber' in message) {
+		m.requestPhoneNumberMessage = {}
 	} else if('sharePhoneNumber' in message) {
 		m.protocolMessage = {
 			type: proto.Message.ProtocolMessage.Type.SHARE_PHONE_NUMBER
@@ -669,12 +683,12 @@ export const normalizeMessageContent = (content: WAMessageContent | null | undef
 
 	 // set max iterations to prevent an infinite loop
 	 for(let i = 0;i < 5;i++) {
-		 const inner = getFutureProofMessage(content)
-		 if(!inner) {
-			 break
-		 }
+		const inner = getFutureProofMessage(content)
+		if(!inner) {
+			break
+		}
 
-		 content = inner.message
+		content = inner.message
 	 }
 
 	 return content!
@@ -687,6 +701,7 @@ export const normalizeMessageContent = (content: WAMessageContent | null | undef
 			 || message?.viewOnceMessageV2
 			 || message?.viewOnceMessageV2Extension
 			 || message?.editedMessage
+			 || message?.groupMentionedMessage
 		 )
 	 }
 }
@@ -851,6 +866,42 @@ export const aggregateMessageKeysNotFromMe = (keys: proto.IMessageKey[]) => {
 	}
 
 	return Object.values(keyMap)
+}
+
+/**
+ * WA requires a specific flag when sending a message
+ * that modifies an existing message.
+ * This function computes that flag given some message content
+ *
+ * @param content WA message content that edits
+ */
+export function getEditFlag(content: WAMessageContent | null | undefined) {
+	content = normalizeMessageContent(content)
+	const protocolMsg = content?.protocolMessage
+	const type = protocolMsg?.type
+	if(type === proto.Message.ProtocolMessage.Type.REVOKE) {
+		return (
+			isJidGroup(protocolMsg?.key?.remoteJid || '')
+			&& !protocolMsg?.key?.fromMe
+				? '8'
+				: '7'
+		)
+	}
+
+	if(type === proto.Message.ProtocolMessage.Type.MESSAGE_EDIT) {
+		return '1'
+	}
+
+	const isRemoveReaction = content?.reactionMessage?.text === ''
+	if(isRemoveReaction) {
+		return '7'
+	}
+
+	const isKeepForAllRevoke = content?.keepInChatMessage?.key?.fromMe
+		&& content?.keepInChatMessage?.keepType === proto.KeepType.UNDO_KEEP_FOR_ALL
+	if(isKeepForAllRevoke) {
+		return '7'
+	}
 }
 
 type DownloadMediaMessageContext = {

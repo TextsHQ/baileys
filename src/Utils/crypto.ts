@@ -46,7 +46,7 @@ export const signedKeyPair = (identityKeyPair: KeyPair, keyId: number) => {
 	return { keyPair: preKey, signature, keyId }
 }
 
-const GCM_TAG_LENGTH = 128 >> 3
+const GCM_TAG_LENGTH = 128 >> 3 // 16 bytes
 
 /**
  * encrypt AES 256 GCM;
@@ -62,13 +62,19 @@ export function aesEncryptGCM(plaintext: Uint8Array, key: Uint8Array, iv: Uint8A
  * decrypt AES 256 GCM;
  * where the auth tag is suffixed to the ciphertext
  * */
-export function aesDecryptGCM(ciphertext: Uint8Array, key: Uint8Array, iv: Uint8Array, additionalData: Uint8Array) {
+
+// secret, iv, data, additionalAuthenticatedData
+export function aesDecryptGCM(ciphertext: Uint8Array, key: Uint8Array, iv: Uint8Array, additionalAuthenticatedData?: Uint8Array) {
 	const decipher = createDecipheriv('aes-256-gcm', key, iv)
 	// decrypt additional adata
 	const enc = ciphertext.slice(0, ciphertext.length - GCM_TAG_LENGTH)
 	const tag = ciphertext.slice(ciphertext.length - GCM_TAG_LENGTH)
-	// set additional data
-	decipher.setAAD(additionalData)
+
+	// set additional authenticated data (if any, as it is optional)
+	if(additionalAuthenticatedData) {
+		decipher.setAAD(additionalAuthenticatedData)
+	}
+
 	decipher.setAuthTag(tag)
 
 	return Buffer.concat([ decipher.update(enc), decipher.final() ])
@@ -128,4 +134,28 @@ export function hkdf(buffer: Uint8Array | Buffer, expandedLength: number, info: 
 
 export function derivePairingCodeKey(pairingCode: string, salt: Buffer) {
 	return pbkdf2Sync(pairingCode, salt, 2 << 16, 32, 'sha256')
+}
+
+export function hkdfExpand(prk, info, length) {
+	const hashLen = 32 // Length of the hash output (SHA-256)
+	if(prk.length < hashLen) {
+		throw new Error('prk must be at least HashLen octets')
+	}
+
+	if(length > 255 * hashLen) {
+		throw new Error('Cannot expand to more than 255 * HashLen octets')
+	}
+
+	const n = Math.ceil(length / hashLen)
+	let t = new Uint8Array()
+	let outputBlock = new Uint8Array()
+
+	for(let i = 1; i <= n; i++) {
+		const hmac = createHmac('sha256', prk)
+		hmac.update(Buffer.concat([outputBlock, info, new Uint8Array([i])]))
+		outputBlock = new Uint8Array(hmac.digest())
+		t = Buffer.concat([t, outputBlock])
+	}
+
+	return new Uint8Array(t.slice(0, length))
 }

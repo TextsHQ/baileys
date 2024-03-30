@@ -540,17 +540,12 @@ export const makeChatsSocket = (config: SocketConfig) => {
 	const sendPresenceUpdate = async(type: WAPresence, toJid?: string) => {
 		const me = authState.creds.me!
 		if(type === 'available' || type === 'unavailable') {
-			if(!me!.name) {
-				logger.warn('no name present, ignoring presence update request...')
-				return
-			}
-
 			ev.emit('connection.update', { isOnline: type === 'available' })
 
 			await sendNode({
 				tag: 'presence',
 				attrs: {
-					name: me!.name,
+					...(me.name ? { name: me.name } : {}),
 					type
 				}
 			})
@@ -612,9 +607,6 @@ export const makeChatsSocket = (config: SocketConfig) => {
 		} else if(Array.isArray(content)) {
 			const [firstChild] = content
 			let type = firstChild.tag as WAPresence
-			if(type === 'paused') {
-				type = 'available'
-			}
 
 			if(firstChild.attrs?.media === 'audio') {
 				type = 'recording'

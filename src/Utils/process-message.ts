@@ -4,7 +4,7 @@ import { proto } from '../../WAProto'
 import { AuthenticationCreds, BaileysEventEmitter, Chat, GroupMetadata, ParticipantAction, SignalKeyStoreWithTransaction, SocketConfig, WAMessageStubType } from '../Types'
 import { getContentType, normalizeMessageContent } from '../Utils/messages'
 import { areJidsSameUser, isJidBroadcast, isJidStatusBroadcast, jidNormalizedUser } from '../WABinary'
-import { aesDecryptGCM, hmacSign } from './crypto'
+import { aesDecryptGCM, hkdfExpand, hmacSign } from './crypto'
 import { getKeyAuthor, toNumber } from './generics'
 import { downloadAndProcessHistorySyncNotification } from './history'
 
@@ -40,8 +40,16 @@ export const cleanMessage = (message: proto.IWebMessageInfo, meId: string) => {
 		normaliseKey(content.reactionMessage.key!)
 	}
 
+	if(content?.encReactionMessage) {
+		normaliseKey(content.encReactionMessage.targetMessageKey!)
+	}
+
 	if(content?.pollUpdateMessage) {
 		normaliseKey(content.pollUpdateMessage.pollCreationMessageKey!)
+	}
+
+	if(content?.protocolMessage) {
+		normaliseKey(content.protocolMessage.key!)
 	}
 
 	function normaliseKey(msgKey: proto.IMessageKey) {
@@ -148,6 +156,56 @@ export function decryptPollVote(
 	}
 }
 
+type ReactionContext = {
+	/** normalised jid of the person that created the target message */
+	parentMsgOriginalSenderJid: string
+	/** ID of the original message targeted by the reaction */
+	targetMsgId: string
+	/** reaction creation message enc key */
+	messageSecret: Uint8Array
+	/** lid of the person that reacted */
+	modificationSenderLid: string
+}
+
+
+/**
+ * Decrypt an encrypted reaction
+ * @param reaction encrypted reaction
+ * @param ctx additional info about the reaction required for decryption
+ * @returns list of SHA256 options
+ */
+export function decryptReaction(
+	{ encPayload, encIv }: proto.Message.IEncReactionMessage,
+	{
+		parentMsgOriginalSenderJid,
+		targetMsgId: stanzaId,
+		messageSecret,
+		modificationSenderLid,
+	}: ReactionContext
+) {
+
+	const modificationType = 'Enc Reaction'
+	const sign = Buffer.concat(
+		[
+			toBinary(stanzaId),
+			toBinary(parentMsgOriginalSenderJid),
+			toBinary(modificationSenderLid),
+			toBinary(modificationType)
+		]
+	)
+
+	const key0 = hmacSign(messageSecret, new Uint8Array(32), 'sha256') // OK
+	const decKey = hkdfExpand(key0, sign, 32)
+
+	const decrypted = aesDecryptGCM(encPayload!, decKey, encIv!, undefined)
+
+	return proto.Message.ReactionMessage.decode(decrypted)
+
+	function toBinary(txt: string) {
+		return Buffer.from(txt)
+	}
+}
+
 const processMessage = async(
 	message: proto.IWebMessageInfo,
 	{
@@ -175,6 +233,7 @@ const processMessage = async(
 	}
 
 	const content = normalizeMessageContent(message.message)
+
 
 	// unarchive chat if it's a real message, or someone reacted to our message
 	// and we've the unarchive chats setting on
@@ -250,11 +309,11 @@ const processMessage = async(
 		case proto.Message.ProtocolMessage.Type.REVOKE:
 			ev.emit('messages.update', [
 				{
-					key: {
-						...message.key,
-						id: protocolMsg.key!.id
-					},
-					update: { message: null, messageStubType: WAMessageStubType.REVOKE, key: message.key }
+					key: protocolMsg.key!,
+					update: {
+						message: null,
+						messageStubType: WAMessageStubType.REVOKE
+					}
 				}
 			])
 			break
@@ -279,6 +338,26 @@ const processMessage = async(
 				}
 			}
 
+			break
+		case proto.Message.ProtocolMessage.Type.MESSAGE_EDIT:
+			ev.emit(
+				'messages.update',
+				[
+					{
+						key: protocolMsg.key!,
+						update: {
+							message: {
+								editedMessage: {
+									message: protocolMsg.editedMessage
+								}
+							},
+							messageTimestamp: protocolMsg.timestampMs
+								? Math.floor(toNumber(protocolMsg.timestampMs) / 1000)
+								: message.messageTimestamp
+						}
+					}
+				]
+			)
 			break
 		}
 	} else if(content?.reactionMessage) {
@@ -402,6 +481,48 @@ const processMessage = async(
 			logger?.warn(
 				{ creationMsgKey },
 				'poll creation message not found, cannot decrypt update'
+			)
+		}
+	} else if(content?.encReactionMessage) {
+		const targetMessageKey = content.encReactionMessage.targetMessageKey
+		// we need to fetch the target message to get the reaction enc key
+		if(!targetMessageKey) {
+			return
+		}
+
+		const targetMessage = await getMessage(targetMessageKey)
+
+		if(targetMessage) {
+			const meIdNormalised = jidNormalizedUser(meId)
+			const originalMessageSenderJid = getKeyAuthor(targetMessageKey, meIdNormalised)
+			const modificationSenderLid = message.key.participant!
+			const messageSecret = targetMessage.messageContextInfo?.messageSecret!
+
+			try {
+				const reaction = decryptReaction(
+					content.encReactionMessage,
+					{
+						messageSecret,
+						parentMsgOriginalSenderJid: originalMessageSenderJid,
+						targetMsgId: targetMessageKey.id!,
+						modificationSenderLid,
+					}
+				)
+
+				ev.emit('messages.reaction', [{
+					reaction: { ...reaction, key: message.key },
+					key: targetMessageKey,
+				}])
+			} catch(err) {
+				logger?.warn(
+					{ err, targetMessageKey },
+					'failed to decrypt reaction'
+				)
+			}
+		} else {
+			logger?.warn(
+				{ targetMessageKey },
+				'reaction creation message not found, cannot decrypt update'
 			)
 		}
 	}
